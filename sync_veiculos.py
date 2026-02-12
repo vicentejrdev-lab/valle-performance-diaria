@@ -1,3 +1,9 @@
+print("DEBUG:")
+print("TOKEN_BASE =", TOKEN_BASE)
+print("USUARIO =", USUARIO)
+print("DB_HOST =", DB_HOST)
+
+
 import requests
 import time
 import psycopg2
