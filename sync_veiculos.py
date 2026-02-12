@@ -74,14 +74,21 @@ def autenticar():
 
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
+
+    token_usuario = resp.json().get("token_usuario")
+
+    if not token_usuario:
+        raise ValueError("❌ token_usuario não retornado pela API.")
+
     print("✅ Autenticado")
+    return token_usuario.strip()
 
 # ================= LISTAR VEÍCULOS =================
 
-def listar_veiculos():
+def listar_veiculos(token_usuario):
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {TOKEN_BASE}"
+        "Authorization": f"Bearer {token_usuario}"
     }
 
     veiculos_totais = []
@@ -200,6 +207,6 @@ def salvar_no_postgres(veiculos):
 # ================= MAIN =================
 
 if __name__ == "__main__":
-    autenticar()
-    veiculos = listar_veiculos()
+    token = autenticar()
+    veiculos = listar_veiculos(token)
     salvar_no_postgres(veiculos)
