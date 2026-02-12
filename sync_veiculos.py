@@ -75,7 +75,6 @@ def autenticar():
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
     print("✅ Autenticado")
-    return True
 
 # ================= LISTAR VEÍCULOS =================
 
@@ -98,7 +97,13 @@ def listar_veiculos():
             "nome_voluntario": VOLUNTARIO
         }
 
-        resp = requests.post(BASE_URL + "/listar/veiculo", json=payload, headers=headers, timeout=60)
+        resp = requests.post(
+            BASE_URL + "/listar/veiculo",
+            json=payload,
+            headers=headers,
+            timeout=60
+        )
+
         resp.raise_for_status()
 
         data = resp.json()
@@ -160,4 +165,41 @@ def salvar_no_postgres(veiculos):
 
     for v in veiculos:
         data_contrato = v.get("data_contrato")
-        if d
+
+        if data_contrato:
+            data_contrato = datetime.datetime.strptime(
+                data_contrato[:10],
+                "%Y-%m-%d"
+            ).date()
+
+        dados.append((
+            v.get("codigo_veiculo"),
+            v.get("placa"),
+            v.get("modelo"),
+            v.get("marca"),
+            v.get("nome_associado"),
+            data_contrato,
+            v.get("codigo_cooperativa"),
+            v.get("codigo_situacao"),
+            v.get("codigo_associado"),
+            v.get("valor_fipe"),
+            v.get("ano_modelo"),
+            v.get("tipo"),
+            v.get("nome_voluntario"),
+            v.get("codigo_voluntario")
+        ))
+
+    execute_batch(cur, insert_sql, dados, page_size=1000)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print("✅ Carga finalizada")
+
+# ================= MAIN =================
+
+if __name__ == "__main__":
+    autenticar()
+    veiculos = listar_veiculos()
+    salvar_no_postgres(veiculos)
