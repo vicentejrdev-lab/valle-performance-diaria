@@ -1,9 +1,3 @@
-print("DEBUG:")
-print("TOKEN_BASE =", TOKEN_BASE)
-print("USUARIO =", USUARIO)
-print("DB_HOST =", DB_HOST)
-
-
 import requests
 import time
 import psycopg2
@@ -22,6 +16,7 @@ SENHA = os.getenv("SENHA_API")
 CODIGO_COOPERATIVA = os.getenv("CODIGO_COOPERATIVA")
 DATA_CONTRATO_INICIO = os.getenv("DATA_CONTRATO_INICIO")
 DATA_CONTRATO_FIM = os.getenv("DATA_CONTRATO_FIM")
+
 LIMIT_PER_PAGE = 1000
 VOLUNTARIO = "VOLUNTARIO"
 
@@ -31,8 +26,33 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-if not all([TOKEN_BASE, USUARIO, SENHA, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
-    raise ValueError("Variáveis de ambiente não configuradas.")
+# ================= DEBUG =================
+
+print("🔎 DEBUG VARIÁVEIS:")
+print("TOKEN_BASE:", "OK" if TOKEN_BASE else "None")
+print("USUARIO:", "OK" if USUARIO else "None")
+print("DB_HOST:", DB_HOST if DB_HOST else "None")
+
+# ================= VALIDAÇÃO =================
+
+variaveis = {
+    "TOKEN_BASE": TOKEN_BASE,
+    "USUARIO_API": USUARIO,
+    "SENHA_API": SENHA,
+    "CODIGO_COOPERATIVA": CODIGO_COOPERATIVA,
+    "DATA_CONTRATO_INICIO": DATA_CONTRATO_INICIO,
+    "DATA_CONTRATO_FIM": DATA_CONTRATO_FIM,
+    "DB_HOST": DB_HOST,
+    "DB_PORT": DB_PORT,
+    "DB_NAME": DB_NAME,
+    "DB_USER": DB_USER,
+    "DB_PASSWORD": DB_PASSWORD
+}
+
+faltando = [k for k, v in variaveis.items() if not v]
+
+if faltando:
+    raise ValueError(f"❌ Variáveis ausentes: {faltando}")
 
 # ================= AUTENTICAÇÃO =================
 
