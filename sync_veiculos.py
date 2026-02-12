@@ -5,7 +5,7 @@ import datetime
 import os
 from psycopg2.extras import execute_batch
 
-# ================= CONFIGURAÇÕES VIA ENV =================
+# ================= CONFIGURAÇÕES =================
 
 BASE_URL = "https://api.hinova.com.br/api/sga/v2"
 
@@ -17,24 +17,27 @@ CODIGO_COOPERATIVA = os.getenv("CODIGO_COOPERATIVA")
 DATA_CONTRATO_INICIO = os.getenv("DATA_CONTRATO_INICIO")
 DATA_CONTRATO_FIM = os.getenv("DATA_CONTRATO_FIM")
 
-LIMIT_PER_PAGE = 1000
-VOLUNTARIO = "VOLUNTARIO"
-
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# ================= DEBUG =================
+LIMIT_PER_PAGE = 1000
+VOLUNTARIO = "VOLUNTARIO"
 
+# ===== LIMPAR ESPAÇOS =====
+if TOKEN_BASE: TOKEN_BASE = TOKEN_BASE.strip()
+if USUARIO: USUARIO = USUARIO.strip()
+if SENHA: SENHA = SENHA.strip()
+
+# ===== DEBUG =====
 print("🔎 DEBUG VARIÁVEIS:")
 print("TOKEN_BASE:", "OK" if TOKEN_BASE else "None")
 print("USUARIO:", "OK" if USUARIO else "None")
-print("DB_HOST:", DB_HOST if DB_HOST else "None")
+print("DB_HOST:", "***" if DB_HOST else "None")
 
-# ================= VALIDAÇÃO =================
-
+# ===== VALIDAÇÃO =====
 variaveis = {
     "TOKEN_BASE": TOKEN_BASE,
     "USUARIO_API": USUARIO,
@@ -72,14 +75,14 @@ def autenticar():
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
     print("✅ Autenticado")
-    return resp.json().get("token_usuario")
+    return True
 
 # ================= LISTAR VEÍCULOS =================
 
-def listar_veiculos(token_usuario):
+def listar_veiculos():
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {token_usuario}"
+        "Authorization": f"Bearer {TOKEN_BASE}"
     }
 
     veiculos_totais = []
@@ -157,37 +160,4 @@ def salvar_no_postgres(veiculos):
 
     for v in veiculos:
         data_contrato = v.get("data_contrato")
-        if data_contrato:
-            data_contrato = datetime.datetime.strptime(data_contrato[:10], "%Y-%m-%d").date()
-
-        dados.append((
-            v.get("codigo_veiculo"),
-            v.get("placa"),
-            v.get("modelo"),
-            v.get("marca"),
-            v.get("nome_associado"),
-            data_contrato,
-            v.get("codigo_cooperativa"),
-            v.get("codigo_situacao"),
-            v.get("codigo_associado"),
-            v.get("valor_fipe"),
-            v.get("ano_modelo"),
-            v.get("tipo"),
-            v.get("nome_voluntario"),
-            v.get("codigo_voluntario")
-        ))
-
-    execute_batch(cur, insert_sql, dados, page_size=1000)
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    print("✅ Carga finalizada")
-
-# ================= MAIN =================
-
-if __name__ == "__main__":
-    token = autenticar()
-    veiculos = listar_veiculos(token)
-    salvar_no_postgres(veiculos)
+        if d
