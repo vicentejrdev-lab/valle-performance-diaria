@@ -1,0 +1,39 @@
+name: Sync Veiculos Valle
+
+on:
+  schedule:
+    # 10:00 BRT (13:00 UTC)
+    - cron: "0 13 * * 1-6"
+
+    # 17:00 BRT (20:00 UTC) somente segunda a sexta
+    - cron: "0 20 * * 1-5"
+
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests psycopg2-binary
+
+      - name: Run Script
+        env:
+          TOKEN_BASE: ${{ secrets.TOKEN_BASE }}
+          USUARIO_API: ${{ secrets.USUARIO_API }}
+          SENHA_API: ${{ secrets.SENHA_API }}
+          CODIGO_COOPERATIVA: ${{ secrets.CODIGO_COOPERATIVA }}
+          DATA_CONTRATO_INICIO: ${{ secrets.DATA_CONTRATO_INICIO }}
+          DATA_CONTRATO_FIM: ${{ secrets.DATA_CONTRATO_FIM }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: python sync_veiculos.py
