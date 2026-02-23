@@ -2,12 +2,14 @@ import os
 import requests
 import time
 import psycopg2
+import sys
 from datetime import datetime
 from psycopg2.extras import execute_batch
-from requests.exceptions import RequestException, JSONDecodeError
 
-# --- Configurações via Variáveis de Ambiente (Segurança) ---
+# --- Configurações via Variáveis de Ambiente ---
 BASE_URL = "https://api.hinova.com.br/api/sga/v2"
+
+# Pegando os dados do GitHub Secrets
 TOKEN_BASE = os.getenv("HINOVA_TOKEN_BASE")
 USUARIO = os.getenv("HINOVA_USUARIO")
 SENHA = os.getenv("HINOVA_SENHA")
@@ -17,6 +19,17 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+# --- DEBUG DE SEGURANÇA (Para você ver se o GitHub está lendo os Secrets) ---
+print("--- CHECKLIST DE CREDENCIAIS ---")
+print(f"TOKEN_BASE carregado: {'SIM' if TOKEN_BASE else 'NÃO (ERRO NO SECRET)'}")
+print(f"USUARIO carregado: {USUARIO if USUARIO else 'NÃO (ERRO NO SECRET)'}")
+print(f"SENHA carregada: {'SIM' if SENHA else 'NÃO (ERRO NO SECRET)'}")
+print("--------------------------------")
+
+if not all([TOKEN_BASE, USUARIO, SENHA]):
+    print("ERRO CRÍTICO: Variáveis de ambiente faltando. Verifique os Secrets no GitHub.")
+    sys.exit(1)
 
 CODIGO_COOPERATIVA = "48"
 DATA_CONTRATO_INICIO = "2025-01-01"
@@ -38,14 +51,32 @@ SITUACOES = [
 ]
 
 def autenticar():
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN_BASE}"}
-    payload = {"usuario": USUARIO, "senha": SENHA}
-    resp = requests.post(f"{BASE_URL}/usuario/autenticar", json=payload, headers=headers, timeout=30)
-    resp.raise_for_status()
-    token = resp.json().get("token_usuario")
-    if not token: raise ValueError("Falha na autenticação")
-    print("Autenticado com sucesso")
-    return token
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {TOKEN_BASE}"
+    }
+    payload = {
+        "usuario": USUARIO,
+        "senha": SENHA
+    }
+
+    try:
+        resp = requests.post(f"{BASE_URL}/usuario/autenticar", json=payload, headers=headers, timeout=30)
+        
+        if resp.status_code == 401:
+            print(f"ERRO 401: Credenciais inválidas. Payload enviado: {{'usuario': '{USUARIO}', 'senha': '***'}}")
+            print(f"Resposta da API: {resp.text}")
+        
+        resp.raise_for_status()
+        token = resp.json().get("token_usuario")
+        if not token:
+            raise ValueError("Falha na autenticação: token_usuario não retornado.")
+        
+        print("Autenticado com sucesso")
+        return token
+    except Exception as e:
+        print(f"Falha na conexão/autenticação: {e}")
+        raise
 
 def listar_veiculos_por_situacao(token_usuario, codigo_situacao, descricao):
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token_usuario}"}
@@ -74,6 +105,10 @@ def listar_veiculos_por_situacao(token_usuario, codigo_situacao, descricao):
     return todos
 
 def salvar_no_postgres(veiculos):
+    if not veiculos:
+        print("Nenhum veículo para salvar.")
+        return
+    
     conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
     cur = conn.cursor()
     cur.execute("""
@@ -97,7 +132,12 @@ def salvar_no_postgres(veiculos):
     dados = []
     for v in veiculos:
         data_c = v.get("data_contrato")
-        if data_c: data_c = datetime.strptime(data_c[:10], "%Y-%m-%d").date()
+        if data_c:
+            try:
+                data_c = datetime.strptime(data_c[:10], "%Y-%m-%d").date()
+            except:
+                data_c = None
+        
         dados.append((
             v.get("codigo_veiculo"), v.get("placa"), v.get("modelo"), v.get("marca"),
             v.get("nome_associado"), data_c, v.get("codigo_cooperativa"),
@@ -108,11 +148,15 @@ def salvar_no_postgres(veiculos):
     conn.commit()
     cur.close()
     conn.close()
-    print("Carga finalizada com sucesso")
+    print(f"Carga de {len(veiculos)} veículos finalizada com sucesso")
 
 if __name__ == "__main__":
-    token = autenticar()
-    veiculos_geral = []
-    for situacao in SITUACOES:
-        veiculos_geral.extend(listar_veiculos_por_situacao(token, situacao["codigo"], situacao["descricao"]))
-    salvar_no_postgres(veiculos_geral)
+    try:
+        token = autenticar()
+        veiculos_geral = []
+        for situacao in SITUACOES:
+            veiculos_geral.extend(listar_veiculos_por_situacao(token, situacao["codigo"], situacao["descricao"]))
+        salvar_no_postgres(veiculos_geral)
+    except Exception as e:
+        print(f"Erro na execução principal: {e}")
+        sys.exit(1)
