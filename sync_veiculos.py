@@ -1,58 +1,54 @@
 import requests
 import time
 import psycopg2
-from datetime import datetime
-import os
+import datetime
 from psycopg2.extras import execute_batch
+from requests.exceptions import RequestException, JSONDecodeError
 
 # ================= CONFIGURAÇÕES =================
 
 BASE_URL = "https://api.hinova.com.br/api/sga/v2"
 
-TOKEN_BASE = os.getenv("TOKEN_BASE")
-USUARIO = os.getenv("USUARIO_API")
-SENHA = os.getenv("SENHA_API")
+TOKEN_BASE = "63a016edf6e94187ca280bbee808d25c4bdd7b5ab27b371a081de12413fbfb7bdea75658f1e518480e2fb0ca33488d8bc711e02a80617d933603142469b1c5ee5f6a732c4d0014537caee7c87bcf16c359144a7a1f8ab6bf3805a8292289bbb4"
+USUARIO = "VICENTEJR"
+SENHA = "pa7663CG#"
 
-CODIGO_COOPERATIVA = os.getenv("CODIGO_COOPERATIVA")
-
+CODIGO_COOPERATIVA = "48"
 DATA_CONTRATO_INICIO = "2025-01-01"
-DATA_CONTRATO_FIM = datetime.now().strftime("%Y-%m-%d")
-
+DATA_CONTRATO_FIM = "2026-12-31"
 LIMIT_PER_PAGE = 1000
+VOLUNTARIO = "VOLUNTARIO"
 
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = "opal4.opalstack.com"
+DB_PORT = "5432"
+DB_NAME = "ancore_db"
+DB_USER = "ancore_user"
+DB_PASSWORD = "urOcaq9XI7Y1CCS"
 
-# ================= DEBUG DE VARIÁVEIS =================
+# ================= SITUAÇÕES =================
 
-print("====== DEBUG SECRETS ======")
-print("USUARIO:", USUARIO)
-print("SENHA tamanho:", len(SENHA) if SENHA else None)
-print("TOKEN_BASE tamanho:", len(TOKEN_BASE) if TOKEN_BASE else None)
-print("CODIGO_COOPERATIVA:", CODIGO_COOPERATIVA)
-print("===========================")
-
-# ================= VALIDAÇÃO =================
-
-variaveis = {
-    "TOKEN_BASE": TOKEN_BASE,
-    "USUARIO_API": USUARIO,
-    "SENHA_API": SENHA,
-    "CODIGO_COOPERATIVA": CODIGO_COOPERATIVA,
-    "DB_HOST": DB_HOST,
-    "DB_PORT": DB_PORT,
-    "DB_NAME": DB_NAME,
-    "DB_USER": DB_USER,
-    "DB_PASSWORD": DB_PASSWORD
-}
-
-faltando = [k for k, v in variaveis.items() if not v]
-
-if faltando:
-    raise ValueError(f"Variáveis de ambiente ausentes: {faltando}")
+SITUACOES = [
+    {"codigo": "1", "descricao": "ATIVO"},
+    {"codigo": "2", "descricao": "INATIVO"},
+    {"codigo": "3", "descricao": "PENDENTE"},
+    {"codigo": "4", "descricao": "INADIMPLENTE"},
+    {"codigo": "5", "descricao": "NEGADO"},
+    {"codigo": "6", "descricao": "SUSPENSO"},
+    {"codigo": "7", "descricao": "SUSPENSO PENDENCIA"},
+    {"codigo": "8", "descricao": "PENDENCIA"},
+    {"codigo": "9", "descricao": "SUSPENSO ADIMPLENTE"},
+    {"codigo": "10", "descricao": "ATIVO PENDENTE"},
+    {"codigo": "11", "descricao": "INATIVO PENDENTE"},
+    {"codigo": "12", "descricao": "INADIMPLENTE PENDENTE"},
+    {"codigo": "14", "descricao": "EXCLUSÃO PENDENTE"},
+    {"codigo": "16", "descricao": "INADIMPLENTE - EM CANCELAMENTO"},
+    {"codigo": "17", "descricao": "INATIVO - EM CANCELAMENTO"},
+    {"codigo": "18", "descricao": "INADIMPLENTE PENDENTE - EM CANCELAMENTO"},
+    {"codigo": "19", "descricao": "INADIMPLENTE L. FECHAMENTO"},
+    {"codigo": "20", "descricao": "INADIMPLENTE PENDENTE L. FECHAMENTO"},
+    {"codigo": "21", "descricao": "SUSPENSO TERCEIRIZADA"},
+    {"codigo": "22", "descricao": "EM CANCELAMENTO"}
+]
 
 # ================= AUTENTICAÇÃO =================
 
@@ -65,29 +61,23 @@ def autenticar():
     }
 
     payload = {
-        "usuario": USUARIO.strip(),
-        "senha": SENHA.strip()
+        "usuario": USUARIO,
+        "senha": SENHA
     }
 
-    resp = requests.post(url, json=payload, headers=headers, timeout=30)
-
-    print("Status Code:", resp.status_code)
-    print("Resposta:", resp.text)
-
-    resp.raise_for_status()
-
-    data = resp.json()
-    token_usuario = data.get("token_usuario")
-
-    if not token_usuario:
-        raise ValueError("API não retornou token_usuario")
-
-    print("Autenticado com sucesso")
-    return token_usuario
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        token_usuario = resp.json().get("token_usuario")
+        print("✅ Autenticado")
+        return token_usuario
+    except Exception as e:
+        print("❌ Falha na autenticação:", e)
+        return None
 
 # ================= LISTAR VEÍCULOS =================
 
-def listar_veiculos(token_usuario):
+def listar_veiculos_por_situacao(token_usuario, codigo_situacao, descricao):
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token_usuario}"
@@ -98,29 +88,33 @@ def listar_veiculos(token_usuario):
 
     while True:
         payload = {
+            "codigo_situacao": codigo_situacao,
             "inicio_paginacao": offset,
             "quantidade_por_pagina": LIMIT_PER_PAGE,
             "data_contrato": DATA_CONTRATO_INICIO,
             "data_contrato_final": DATA_CONTRATO_FIM,
-            "codigo_cooperativa": CODIGO_COOPERATIVA
+            "codigo_cooperativa": CODIGO_COOPERATIVA,
+            "nome_voluntario": VOLUNTARIO
         }
 
-        resp = requests.post(
-            BASE_URL + "/listar/veiculo",
-            json=payload,
-            headers=headers,
-            timeout=60
-        )
+        try:
+            resp = requests.post(BASE_URL + "/listar/veiculo", json=payload, headers=headers, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            print("Erro ao buscar:", e)
+            break
 
-        resp.raise_for_status()
-
-        data = resp.json()
         veiculos = data.get("veiculos", [])
-
         if not veiculos:
             break
 
+        for v in veiculos:
+            v["descricao_situacao"] = descricao
+
         veiculos_totais.extend(veiculos)
+
+        print(f"{descricao}: +{len(veiculos)} registros (total {len(veiculos_totais)})")
 
         if len(veiculos) < LIMIT_PER_PAGE:
             break
@@ -128,12 +122,12 @@ def listar_veiculos(token_usuario):
         offset += LIMIT_PER_PAGE
         time.sleep(1)
 
-    print(f"Total veículos coletados: {len(veiculos_totais)}")
     return veiculos_totais
 
 # ================= SALVAR NO POSTGRES =================
 
 def salvar_no_postgres(veiculos):
+    print("🔗 Conectando ao PostgreSQL...")
 
     conn = psycopg2.connect(
         host=DB_HOST,
@@ -142,58 +136,42 @@ def salvar_no_postgres(veiculos):
         user=DB_USER,
         password=DB_PASSWORD
     )
-
+    conn.autocommit = True
     cur = conn.cursor()
 
+    # cria tabela se não existir
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS veiculos_valle (
-            codigo_veiculo INT PRIMARY KEY,
-            placa TEXT,
-            modelo TEXT,
-            marca TEXT,
-            nome_associado TEXT,
-            data_contrato DATE,
-            codigo_cooperativa INT,
-            codigo_situacao INT,
-            codigo_associado INT,
-            valor_fipe NUMERIC(10,2),
-            ano_modelo INT,
-            tipo TEXT,
-            nome_voluntario TEXT,
-            codigo_voluntario INT
-        );
+    CREATE TABLE IF NOT EXISTS veiculos_valle (
+        codigo_veiculo INT,
+        placa TEXT,
+        modelo TEXT,
+        marca TEXT,
+        nome_associado TEXT,
+        data_contrato DATE,
+        codigo_cooperativa INT,
+        codigo_situacao INT,
+        codigo_associado INT,
+        valor_fipe NUMERIC (10,2),
+        ano_modelo INT,
+        tipo TEXT,
+        nome_voluntario TEXT,
+        codigo_voluntario INT
+    );
     """)
 
+    # limpa dados (sem quebrar views)
+    print("🧹 Limpando tabela...")
+    cur.execute("TRUNCATE TABLE veiculos_valle;")
+
     insert_sql = """
-        INSERT INTO veiculos_valle (
-            codigo_veiculo, placa, modelo, marca, nome_associado,
-            data_contrato, codigo_cooperativa, codigo_situacao,
-            codigo_associado, valor_fipe, ano_modelo, tipo,
-            nome_voluntario, codigo_voluntario
-        )
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (codigo_veiculo) DO UPDATE SET
-            placa = EXCLUDED.placa,
-            modelo = EXCLUDED.modelo,
-            marca = EXCLUDED.marca,
-            nome_associado = EXCLUDED.nome_associado,
-            data_contrato = EXCLUDED.data_contrato,
-            codigo_cooperativa = EXCLUDED.codigo_cooperativa,
-            codigo_situacao = EXCLUDED.codigo_situacao,
-            codigo_associado = EXCLUDED.codigo_associado,
-            valor_fipe = EXCLUDED.valor_fipe,
-            ano_modelo = EXCLUDED.ano_modelo,
-            tipo = EXCLUDED.tipo,
-            nome_voluntario = EXCLUDED.nome_voluntario,
-            codigo_voluntario = EXCLUDED.codigo_voluntario;
+    INSERT INTO veiculos_valle VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """
 
     dados = []
-
     for v in veiculos:
         data_contrato = v.get("data_contrato")
         if data_contrato:
-            data_contrato = datetime.strptime(data_contrato[:10], "%Y-%m-%d").date()
+            data_contrato = datetime.datetime.strptime(data_contrato[:10], "%Y-%m-%d").date()
 
         dados.append((
             v.get("codigo_veiculo"),
@@ -212,17 +190,21 @@ def salvar_no_postgres(veiculos):
             v.get("codigo_voluntario")
         ))
 
+    print(f"📥 Inserindo {len(dados)} registros...")
     execute_batch(cur, insert_sql, dados, page_size=1000)
 
-    conn.commit()
     cur.close()
     conn.close()
-
-    print("Carga finalizada com sucesso")
+    print("✅ Carga finalizada!")
 
 # ================= MAIN =================
 
 if __name__ == "__main__":
     token = autenticar()
-    veiculos = listar_veiculos(token)
-    salvar_no_postgres(veiculos)
+
+    if token:
+        todos = []
+        for s in SITUACOES:
+            todos.extend(listar_veiculos_por_situacao(token, s["codigo"], s["descricao"]))
+
+        salvar_no_postgres(todos)
