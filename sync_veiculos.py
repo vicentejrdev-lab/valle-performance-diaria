@@ -15,7 +15,6 @@ SENHA = os.getenv("SENHA_API")
 
 CODIGO_COOPERATIVA = os.getenv("CODIGO_COOPERATIVA")
 
-# 🔥 DATA FINAL DINÂMICA (corrige problema de travar no dia 12)
 DATA_CONTRATO_INICIO = "2025-01-01"
 DATA_CONTRATO_FIM = datetime.now().strftime("%Y-%m-%d")
 
@@ -26,6 +25,15 @@ DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+# ================= DEBUG DE VARIÁVEIS =================
+
+print("====== DEBUG SECRETS ======")
+print("USUARIO:", USUARIO)
+print("SENHA tamanho:", len(SENHA) if SENHA else None)
+print("TOKEN_BASE tamanho:", len(TOKEN_BASE) if TOKEN_BASE else None)
+print("CODIGO_COOPERATIVA:", CODIGO_COOPERATIVA)
+print("===========================")
 
 # ================= VALIDAÇÃO =================
 
@@ -57,8 +65,8 @@ def autenticar():
     }
 
     payload = {
-        "usuario": USUARIO,
-        "senha": SENHA
+        "usuario": USUARIO.strip(),
+        "senha": SENHA.strip()
     }
 
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
