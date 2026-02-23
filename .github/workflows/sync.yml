@@ -1,38 +1,33 @@
-name: Sync Veiculos Valle
+name: Hinova Sync
 
 on:
-  schedule:
-    - cron: "0 13 * * 1-5"   # 10:00 Brasil
-    - cron: "0 20 * * 1-5"   # 17:00 Brasil
-  workflow_dispatch:
+  workflow_dispatch: # Permite rodar manualmente clicando no botão
 
 jobs:
-  sync:
+  run-sync:
     runs-on: ubuntu-latest
-
-    env:
-      TOKEN_BASE: ${{ secrets.TOKEN_BASE }}
-      USUARIO_API: ${{ secrets.USUARIO_API }}
-      SENHA_API: ${{ secrets.SENHA_API }}
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_PORT: ${{ secrets.DB_PORT }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      CODIGO_COOPERATIVA: ${{ secrets.CODIGO_COOPERATIVA }}
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           pip install requests psycopg2-binary
 
-      - name: Run script
+      - name: Run Script
+        env:
+          # ESSA PARTE É A PONTE. O nome da esquerda é o que o Python lê.
+          # O nome da direita (dentro das chaves) deve ser o nome exato que está no painel do GitHub.
+          HINOVA_TOKEN_BASE: ${{ secrets.HINOVA_TOKEN_BASE }}
+          HINOVA_USUARIO: ${{ secrets.HINOVA_USUARIO }}
+          HINOVA_SENHA: ${{ secrets.HINOVA_SENHA }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: python sync_veiculos.py
